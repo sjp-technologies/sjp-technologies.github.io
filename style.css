@@ -120,3 +120,6 @@ body.home-page{
 .menu-toggle:active{transform:scale(.96)}
 @media(max-width:800px){.menu-toggle{display:flex!important}}
 @media(min-width:801px){.menu-toggle{display:none!important}}
+
+/* Public visitor counter: display only, do not navigate to external statistics. */
+.visitor-counter a{pointer-events:none!important;cursor:default!important;text-decoration:none!important}
