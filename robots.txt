@@ -1,0 +1,3 @@
+User-agent: *
+Allow: /
+Sitemap: https://sjp-technologies.github.io/sitemap.xml
