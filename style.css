@@ -173,3 +173,59 @@ body.home-page{
  .home-page .visitor-strip .visitor-total{min-width:68px}
 }
 @media(max-width:360px){.home-page .visitor-strip .counter-caption{font-size:8px}.home-page .visitor-strip .visitor-readout{min-width:54px;padding:3px 3px}}
+
+
+/* Design 2 — refined digital counter bar preview */
+.home-page .visitor-strip{
+  background:linear-gradient(110deg,#fbfaff 0%,#f2f8ff 55%,#fffaf5 100%);
+  border-top:1px solid #e5def3;
+  border-bottom:1px solid #e5def3;
+  box-shadow:none;
+}
+.home-page .visitor-strip-inner{
+  max-width:760px;
+  min-height:82px;
+  padding:11px 0;
+}
+.home-page .visitor-strip .visitor-stat{
+  min-height:58px;
+  gap:7px;
+  padding:0 14px;
+}
+.home-page .visitor-strip .visitor-stat+.visitor-stat{
+  border-left:1px solid #d9d2e9!important;
+}
+.home-page .visitor-strip .counter-caption{
+  color:#75658f;
+  font-size:10px;
+  font-weight:800;
+  letter-spacing:.65px;
+}
+.home-page .visitor-strip .visitor-stat:first-child .counter-caption{
+  color:#15966a;
+}
+.home-page .visitor-strip .visitor-readout{
+  min-width:0;
+  min-height:0;
+  padding:0;
+  border:0;
+  border-radius:0;
+  background:transparent;
+  box-shadow:none;
+  overflow:visible;
+}
+.home-page .visitor-strip .visitor-readout img{
+  max-height:27px;
+  filter:drop-shadow(0 2px 2px rgba(30,35,65,.13));
+}
+.home-page .visitor-strip .visitor-total{min-width:0}
+@media(max-width:700px){
+ .home-page .visitor-strip-inner{min-height:70px;padding:9px 0}
+ .home-page .visitor-strip .visitor-stat{min-height:50px;padding:0 5px;gap:6px}
+ .home-page .visitor-strip .counter-caption{font-size:9px;letter-spacing:.1px}
+ .home-page .visitor-strip .visitor-readout img{max-height:24px}
+}
+@media(max-width:360px){
+ .home-page .visitor-strip .counter-caption{font-size:8px}
+ .home-page .visitor-strip .visitor-readout img{max-height:21px}
+}
