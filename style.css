@@ -125,3 +125,11 @@ body.home-page{
 .visitor-counter{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:10px;overflow:hidden}
 .visitor-counter a{pointer-events:none!important;cursor:default!important;text-decoration:none!important}
 .visitor-counter .counter-caption{font-size:13px;font-weight:700;letter-spacing:.04em;color:#9bdcf8;margin-bottom:2px}
+
+
+/* Homepage visitor metrics: lifetime, live now, and daily comparison */
+.visitor-stats-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:16px;align-items:stretch}
+.home-page .visitor-stat{min-height:132px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:14px;padding:20px 14px;text-align:center;overflow:hidden}
+.home-page .visitor-stat .counter-caption{font-size:13px;font-weight:800;letter-spacing:.02em;color:#6847d7}
+.home-page .visitor-stat img{display:block;max-width:100%;height:auto;object-fit:contain}
+@media(max-width:700px){.visitor-stats-grid{grid-template-columns:1fr}.home-page .visitor-stat{min-height:110px}}
