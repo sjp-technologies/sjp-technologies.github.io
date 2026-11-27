@@ -1,0 +1,29 @@
+name: Publish Battle of Brains APK
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  copy-apk:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Download signed APK
+        run: |
+          mkdir -p download
+          curl -fL "https://github.com/shahjalalpramanikbpl/medhar-lorai/releases/download/app-v3.3.1/medhar-lorai-3.3.1.apk" -o download/medhar-lorai.apk
+          test -s download/medhar-lorai.apk
+
+      - name: Commit APK
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add download/medhar-lorai.apk
+          if ! git diff --cached --quiet; then
+            git commit -m "Publish Battle of Brains APK"
+            git push
+          fi
