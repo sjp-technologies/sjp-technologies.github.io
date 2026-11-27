@@ -102,3 +102,21 @@ body.home-page{
 .menu-toggle:active{transform:scale(.94)}
 @media(max-width:800px){.menu-toggle{display:flex!important}}
 @media(min-width:801px){.menu-toggle{display:none!important}}
+
+
+/* Restored clean three-line mobile navigation icon */
+.menu-toggle{
+  width:46px!important;height:46px!important;min-width:46px;
+  display:none;flex-direction:column;align-items:center;justify-content:center;
+  gap:6px;padding:0!important;border:1px solid #8b79c7!important;
+  border-radius:12px!important;background:linear-gradient(145deg,#fff,#eee9ff)!important;
+  color:#39236e!important;box-shadow:0 5px 16px rgba(76,48,155,.14);
+  cursor:pointer;flex-shrink:0;
+}
+.menu-toggle span{
+  display:block;width:23px;height:2.5px;border-radius:3px;
+  background:#51339a;box-shadow:none;
+}
+.menu-toggle:active{transform:scale(.96)}
+@media(max-width:800px){.menu-toggle{display:flex!important}}
+@media(min-width:801px){.menu-toggle{display:none!important}}
