@@ -43,3 +43,48 @@
 .home-page .footer-links a:hover{color:#6847d7}
 .home-page a:focus-visible,.home-page button:focus-visible{outline-color:#6847d7}
 @media(max-width:800px){.home-page .nav-links{background:#fff;border-bottom:1px solid #dce2ef}}
+
+/* FINAL HOMEPAGE VISUAL OVERRIDE — unmistakably new palette */
+body.home-page{
+ --bg:#f5f1ff;--panel:#fff;--line:#ded5f5;--text:#21163f;--muted:#625879;
+ background:linear-gradient(130deg,#f8f4ff 0%,#eaf5ff 48%,#fff1e8 100%)!important;
+ color:#21163f!important;
+}
+.home-page:before{opacity:.24;background-image:radial-gradient(#9578d7 1px,transparent 1px);background-size:24px 24px}
+.home-page .site-header{background:rgba(255,255,255,.94)!important;border-bottom:1px solid #d9d0ef;box-shadow:0 8px 30px rgba(54,31,100,.10)}
+.home-page .nav{min-height:112px}
+.home-page .brand-logo{width:150px;height:112px;background:#071943;border:2px solid #8a6ae9;box-shadow:0 8px 24px #6546d533}
+.home-page .brand-logo .official-logo-svg{width:100%;height:100%;display:block}
+.home-page .nav-links{color:#493d66}
+.home-page .nav-links a.active,.home-page .nav-links a:hover{color:#7446db}
+.home-page .nav-cta,.home-page .btn-primary{background:linear-gradient(115deg,#7041df,#247fc4)!important;color:#fff!important;box-shadow:0 10px 26px #7041df40}
+.home-page .btn-secondary{background:#fff;border:1px solid #cfc3ed;color:#3c2d60}
+.home-page .hero{padding-top:70px;padding-bottom:80px}
+.home-page .eyebrow{color:#7549d8}
+.home-page .gradient-text{background:linear-gradient(90deg,#7041df,#078bb8)!important;-webkit-background-clip:text!important;background-clip:text!important;color:transparent!important}
+.home-page .lead,.home-page .section-copy{color:#625879}
+.home-page .hero-note{color:#756b8b}
+.home-page .feature-card{background:linear-gradient(145deg,#fff 0%,#f0eaff 55%,#e8f6ff 100%)!important;border:1px solid #d7c9f4;box-shadow:0 28px 70px rgba(57,34,105,.16)}
+.home-page .feature-card:before{background:#9a72ff33}
+.home-page .app-label{color:#7549d8}
+.home-page .app-bn{color:#a86412}
+.home-page .feature-card p{color:#625879}
+.home-page .chip{background:#fff;color:#493d66;border:1px solid #d9d0ef}
+.home-page .info-card{background:rgba(255,255,255,.88)!important;border:1px solid #ddd5ee;box-shadow:0 12px 34px rgba(57,34,105,.08)}
+.home-page .info-card:hover{background:#fff!important;border-color:#9c80e8;box-shadow:0 18px 40px rgba(112,65,223,.16)}
+.home-page .info-card p{color:#625879}
+.home-page .highlight{background:linear-gradient(130deg,#e5dcff,#dff3ff)!important;border:1px solid #cfc0f1;box-shadow:0 20px 55px rgba(57,34,105,.12)}
+.home-page .list{color:#55496e}
+.home-page .list li:before{color:#7549d8}
+.home-page .banner{background:linear-gradient(115deg,#ded2ff,#d7efff 62%,#ffe7d7)!important;border:1px solid #cbb9ee;box-shadow:0 20px 55px rgba(57,34,105,.13)}
+.home-page .banner p{color:#55496e}
+.home-page .site-footer{background:#21163f!important;border-top:0;color:#e8e0ff}
+.home-page .site-footer strong{color:#fff!important}
+.home-page .copyright{color:#c0b3df}
+.home-page .footer-links a:hover{color:#a9dcff}
+@media(max-width:800px){
+ .home-page .nav{min-height:88px}
+ .home-page .brand-logo{width:112px;height:84px}
+ .home-page .nav-links{top:88px;background:#fff!important;border-bottom:1px solid #ddd5ee}
+}
+@media(max-width:420px){.home-page .brand-logo{width:100px;height:75px}}
