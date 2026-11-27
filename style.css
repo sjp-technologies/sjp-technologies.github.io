@@ -121,5 +121,7 @@ body.home-page{
 @media(max-width:800px){.menu-toggle{display:flex!important}}
 @media(min-width:801px){.menu-toggle{display:none!important}}
 
-/* Public visitor counter: display only, do not navigate to external statistics. */
+/* Public visitor counter: keep the visible badge on-page and non-navigating. */
+.visitor-counter{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:10px;overflow:hidden}
 .visitor-counter a{pointer-events:none!important;cursor:default!important;text-decoration:none!important}
+.visitor-counter .counter-caption{font-size:13px;font-weight:700;letter-spacing:.04em;color:#9bdcf8;margin-bottom:2px}
