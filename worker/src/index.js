@@ -28,19 +28,25 @@ export class VisitorStore {
         visitor_id TEXT PRIMARY KEY,
         first_seen INTEGER NOT NULL,
         last_seen INTEGER NOT NULL
-      );
+      )
+    `);
+    this.ctx.storage.sql.exec(`
       CREATE TABLE IF NOT EXISTS daily_visits (
         visitor_id TEXT NOT NULL,
         visit_day TEXT NOT NULL,
         PRIMARY KEY (visitor_id, visit_day)
-      );
+      )
     `);
   }
 
   async fetch(request) {
     const url = new URL(request.url);
     const now = Date.now();
-    const today = new Date(now).toLocaleDateString("en-CA", { timeZone: "Asia/Dhaka" });
+    const dateParts = new Intl.DateTimeFormat("en-CA", {
+      timeZone: "Asia/Dhaka", year: "numeric", month: "2-digit", day: "2-digit"
+    }).formatToParts(new Date(now));
+    const dateValue = Object.fromEntries(dateParts.map(part => [part.type, part.value]));
+    const today = `${dateValue.year}-${dateValue.month}-${dateValue.day}`;
 
     if (url.pathname === "/visit" && request.method === "POST") {
       let body;
