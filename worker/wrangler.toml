@@ -1,0 +1,11 @@
+name = "sjp-website-api"
+main = "src/index.js"
+compatibility_date = "2026-11-28"
+
+[[durable_objects.bindings]]
+name = "VISITOR_STORE"
+class_name = "VisitorStore"
+
+[[migrations]]
+tag = "v1"
+new_sqlite_classes = ["VisitorStore"]
