@@ -199,6 +199,7 @@ export class VisitorStore {
       const enabled=body.enabled===true;
       if(text.length>300)return json({error:"নোটিশ সর্বোচ্চ ৩০০ অক্ষরের হতে পারবে"},400);
       const value=JSON.stringify({enabled,text});
+      this.ctx.storage.sql.exec("INSERT INTO admin_audit(action,config_key,changed_at,summary) VALUES(?,?,?,?)","UPDATE","announcement",now,"Notice updated");
       this.ctx.storage.sql.exec("INSERT INTO site_config(config_key,config_value,updated_at) VALUES('announcement',?,?) ON CONFLICT(config_key) DO UPDATE SET config_value=excluded.config_value,updated_at=excluded.updated_at",value,now);
       return json({ok:true,announcement:{enabled,text,updatedAt:now}});
     }
@@ -218,6 +219,7 @@ export class VisitorStore {
         content[field]=value;
       }
       const value=JSON.stringify(content);
+      this.ctx.storage.sql.exec("INSERT INTO admin_audit(action,config_key,changed_at,summary) VALUES(?,?,?,?)","UPDATE","homepage_content",now,"Homepage CMS updated");
       this.ctx.storage.sql.exec("INSERT INTO site_config(config_key,config_value,updated_at) VALUES('homepage_content',?,?) ON CONFLICT(config_key) DO UPDATE SET config_value=excluded.config_value,updated_at=excluded.updated_at",value,now);
       return json({ok:true,content:{...content,updatedAt:now}});
     }
