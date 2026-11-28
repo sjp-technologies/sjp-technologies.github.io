@@ -68,6 +68,8 @@ export default {
     let body;try{body=await request.json()}catch{return json({error:"Invalid JSON"},400,request)}
     const supplied=String(body.password||"");
     if(supplied.length<1||supplied.length>200||supplied!==env.ADMIN_PASSWORD)return json({error:"ভুল পাসওয়ার্ড"},401,request);
+    const auditId=env.VISITOR_STORE.idFromName("global-visitor-store");
+    await env.VISITOR_STORE.get(auditId).fetch(new Request(new URL("/audit-event",request.url),{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({action:"LOGIN",config_key:"admin_session",summary:"Owner admin login successful",actor:"owner"})}));
     return json({ok:true,token:await issueToken(env.ADMIN_PASSWORD),expiresIn:28800},200,request);
   }
   if(url.pathname==="/admin/ga4-report"&&request.method==="POST"){
@@ -82,6 +84,8 @@ export default {
       const response=await fetch("https://analyticsdata.googleapis.com/v1beta/properties/"+encodeURIComponent(env.GA4_PROPERTY_ID)+":runReport",{method:"POST",headers:{Authorization:"Bearer "+token,"Content-Type":"application/json"},body:JSON.stringify({dateRanges:[{startDate,endDate}],dimensions:[{name:"date"},{name:"pagePath"}],metrics:[{name:"activeUsers"},{name:"sessions"},{name:"screenPageViews"},{name:"engagementRate"}],limit:10000})});
       const data=await response.json();
       if(!response.ok)return json({error:"GA4 API error",details:data.error?.message||response.status},502,request);
+      const auditId=env.VISITOR_STORE.idFromName("global-visitor-store");
+      await env.VISITOR_STORE.get(auditId).fetch(new Request(new URL("/audit-event",request.url),{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({action:"GA4_REPORT",config_key:"analytics",summary:"GA4 report requested: "+startDate+" to "+endDate,actor:"owner"})}));
       return json({ok:true,propertyId:env.GA4_PROPERTY_ID,rows:data.rows||[],totals:data.totals||[],rowCount:data.rowCount||0,dimensionHeaders:data.dimensionHeaders||[],metricHeaders:data.metricHeaders||[]},200,request);
     }catch(e){return json({error:"GA4 report failed",details:String(e.message||e)},502,request)}
   }
@@ -97,6 +101,7 @@ export default {
     if(request.headers.get("Origin")!==SITE_ORIGIN||!env.ADMIN_PASSWORD||!(await validToken(request,env.ADMIN_PASSWORD)))return json({error:"Unauthorized"},401,request);
     const id=env.VISITOR_STORE.idFromName("global-visitor-store");
     const target=url.pathname==="/admin/audit"?"/audit":"/backup";
+    if(target==="/backup")await env.VISITOR_STORE.get(id).fetch(new Request(new URL("/audit-event",request.url),{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({action:"BACKUP_EXPORT",config_key:"website_backup",summary:"Website database backup exported",actor:"owner"})}));
     const response=await env.VISITOR_STORE.get(id).fetch(new Request(new URL(target,request.url),{method:"GET"}));
     const headers=new Headers(response.headers);
     for(const [key,value] of Object.entries(corsHeaders(request)))headers.set(key,value);
@@ -246,6 +251,15 @@ export class VisitorStore {
         onlineWindowSeconds: 90,
         timezone: "Asia/Dhaka"
       });
+    }
+    if(url.pathname==="/audit-event"&&request.method==="POST"){
+      let event;try{event=await request.json()}catch{return json({error:"Invalid JSON"},400)}
+      const action=String(event.action||"ADMIN_ACTION").slice(0,80);
+      const configKey=String(event.config_key||"admin").slice(0,120);
+      const summary=String(event.summary||"Admin action").slice(0,500);
+      const actor=String(event.actor||"owner").slice(0,80);
+      this.ctx.storage.sql.exec("INSERT INTO admin_audit(action,config_key,changed_at,summary,actor,before_value,after_value) VALUES(?,?,?,?,?,?,?)",action,configKey,Date.now(),summary,actor,event.before_value==null?null:JSON.stringify(event.before_value),event.after_value==null?null:JSON.stringify(event.after_value));
+      return json({ok:true});
     }
     if(url.pathname==="/audit"&&request.method==="GET"){const rows=this.ctx.storage.sql.exec("SELECT id,action,config_key,changed_at,summary,actor,before_value,after_value FROM admin_audit ORDER BY id DESC LIMIT 200").toArray();return json({items:rows});}
     if(url.pathname==="/backup"&&request.method==="GET"){
