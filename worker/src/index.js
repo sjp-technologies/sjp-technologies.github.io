@@ -107,6 +107,13 @@ export default {
     for (const [key,value] of Object.entries(corsHeaders(request))) headers.set(key,value);
     return new Response(response.body,{status:response.status,statusText:response.statusText,headers});
   }
+  if(url.pathname==="/admin/diagnostics"&&request.method==="GET"){
+    if(request.headers.get("Origin")!==SITE_ORIGIN||!env.ADMIN_PASSWORD||!(await validToken(request,env.ADMIN_PASSWORD)))return json({error:"Unauthorized"},401,request);
+    const id=env.VISITOR_STORE.idFromName("global-visitor-store");
+    const response=await env.VISITOR_STORE.get(id).fetch(new Request(new URL("/diagnostics",request.url),{method:"GET"}));
+    const headers=new Headers(response.headers);for(const [key,value] of Object.entries(corsHeaders(request)))headers.set(key,value);
+    return new Response(response.body,{status:response.status,headers});
+  }
   if((url.pathname==="/admin/audit"||url.pathname==="/admin/backup")&&request.method==="GET"){
     if(request.headers.get("Origin")!==SITE_ORIGIN||!env.ADMIN_PASSWORD||!(await validToken(request,env.ADMIN_PASSWORD)))return json({error:"Unauthorized"},401,request);
     const id=env.VISITOR_STORE.idFromName("global-visitor-store");
@@ -261,6 +268,25 @@ export class VisitorStore {
         onlineWindowSeconds: 90,
         timezone: "Asia/Dhaka"
       });
+    }
+    if(url.pathname==="/diagnostics"&&request.method==="GET"){
+      const configRows=this.ctx.storage.sql.exec("SELECT config_key,updated_at FROM site_config ORDER BY config_key").toArray();
+      let pageCount=0,homepagePresent=false;
+      for(const row of configRows){
+        if(row.config_key==="page_cms"){
+          try{pageCount=Object.keys(JSON.parse(this.ctx.storage.sql.exec("SELECT config_value FROM site_config WHERE config_key='page_cms'").one().config_value)||{}).length}catch{}
+        }
+        if(row.config_key==="homepage_content")homepagePresent=true;
+      }
+      const counts={
+        siteConfig:configRows.length,
+        cmsPages:pageCount,
+        homepageContent:homepagePresent,
+        visitors:this.ctx.storage.sql.exec("SELECT COUNT(*) AS total FROM visitors").one().total,
+        dailyVisits:this.ctx.storage.sql.exec("SELECT COUNT(*) AS total FROM daily_visits").one().total,
+        audit:this.ctx.storage.sql.exec("SELECT COUNT(*) AS total FROM admin_audit").one().total
+      };
+      return json({ok:true,checkedAt:now,timezone:"Asia/Dhaka",counts,configKeys:configRows.map(x=>x.config_key)});
     }
     if(url.pathname==="/audit-event"&&request.method==="POST"){
       let event;try{event=await request.json()}catch{return json({error:"Invalid JSON"},400)}
