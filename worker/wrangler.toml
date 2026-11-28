@@ -2,6 +2,9 @@ name = "sjp-website-api"
 main = "src/index.js"
 compatibility_date = "2026-11-28"
 
+[vars]
+GA4_PROPERTY_ID = "566065632"
+
 [[durable_objects.bindings]]
 name = "VISITOR_STORE"
 class_name = "VisitorStore"
