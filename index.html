@@ -53,9 +53,7 @@
       put("todayVisitors", data.todayVisitors);
       put("totalVisitors", data.totalVisitors);
     }).catch(() => {});
-  post("/visit");
-  post("/heartbeat");
-  updateStats();
+  post("/visit").then(() => { post("/heartbeat"); updateStats(); });
   setInterval(() => { post("/heartbeat"); updateStats(); }, 30000);
 })();
 </script></body></html>
