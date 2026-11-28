@@ -72,6 +72,16 @@ export default {
     await env.VISITOR_STORE.get(auditId).fetch(new Request(new URL("/audit-event",request.url),{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({action:"LOGIN",config_key:"admin_session",summary:"Owner admin login successful",actor:"owner"})}));
     return json({ok:true,token:await issueToken(env.ADMIN_PASSWORD),expiresIn:28800},200,request);
   }
+  if(url.pathname==="/admin/audit-event"&&request.method==="POST"){
+    if(request.headers.get("Origin")!==SITE_ORIGIN||!env.ADMIN_PASSWORD||!(await validToken(request,env.ADMIN_PASSWORD)))return json({error:"Unauthorized"},401,request);
+    let body;try{body=await request.json()}catch{return json({error:"Invalid JSON"},400,request)}
+    const allowed=["SYSTEM_DIAGNOSTICS","ADMIN_LOGOUT","APP_CONSOLE_OPEN"];
+    if(!allowed.includes(String(body.action||"")))return json({error:"Unsupported audit action"},400,request);
+    const id=env.VISITOR_STORE.idFromName("global-visitor-store");
+    const response=await env.VISITOR_STORE.get(id).fetch(new Request(new URL("/audit-event",request.url),{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({action:body.action,config_key:String(body.config_key||"admin").slice(0,120),summary:String(body.summary||body.action).slice(0,500),actor:"owner"})}));
+    const headers=new Headers(response.headers);for(const [key,value] of Object.entries(corsHeaders(request)))headers.set(key,value);
+    return new Response(response.body,{status:response.status,headers});
+  }
   if(url.pathname==="/admin/ga4-report"&&request.method==="POST"){
     if(request.headers.get("Origin")!==SITE_ORIGIN||!env.ADMIN_PASSWORD||!(await validToken(request,env.ADMIN_PASSWORD)))return json({error:"Unauthorized"},401,request);
     if(!env.GA4_PROPERTY_ID||!env.GA4_SERVICE_ACCOUNT_JSON)return json({error:"GA4_PROPERTY_ID এবং GA4_SERVICE_ACCOUNT_JSON Worker secrets-এ সেট করতে হবে"},503,request);
@@ -298,11 +308,11 @@ export class VisitorStore {
       let body;try{body=await request.json()}catch{return json({error:"Invalid JSON"},400)}
       const allowed=["index","about","apps","advertise","battle-of-brains","contact","resources","upcoming"];
       if(!body||typeof body.page!=="string"||!allowed.includes(body.page))return json({error:"Invalid page"},400);
-      const fields=["title","heroText","introText","sectionTitle","sectionText"];
+      const fields=["title","heroText","introText","heroImage","primaryButtonText","primaryButtonUrl","secondaryButtonText","secondaryButtonUrl","sectionTitle","sectionText","section2Title","section2Text","seoDescription"];
       const row=this.ctx.storage.sql.exec("SELECT config_value FROM site_config WHERE config_key='page_cms'").toArray()[0];
       let pages={};if(row){try{pages=JSON.parse(row.config_value)}catch{}}
       const before=pages[body.page]||null;
-      const content={};for(const f of fields){const v=String(body[f]??"").trim();if(v.length>1200)return json({error:f+" সর্বোচ্চ ১২০০ অক্ষর"},400);content[f]=v;}
+      const content={};for(const f of fields){const v=String(body[f]??"").trim();if(v.length>1200)return json({error:f+" সর্বোচ্চ ১২০০ অক্ষর"},400);if((f.endsWith("Url")||f==="heroImage")&&v&&!/^https:\/\//i.test(v))return json({error:f+"-এ https URL দিতে হবে"},400);content[f]=v;}
       pages[body.page]=content;const value=JSON.stringify(pages);
       this.ctx.storage.sql.exec("INSERT INTO admin_audit(action,config_key,changed_at,summary,actor,before_value,after_value) VALUES(?,?,?,?,?,?,?)","UPDATE","page_cms:"+body.page,now,"Page CMS updated: "+body.page,"owner",before===null?null:JSON.stringify(before),JSON.stringify(content));
       this.ctx.storage.sql.exec("INSERT INTO site_config(config_key,config_value,updated_at) VALUES('page_cms',?,?) ON CONFLICT(config_key) DO UPDATE SET config_value=excluded.config_value,updated_at=excluded.updated_at",value,now);
