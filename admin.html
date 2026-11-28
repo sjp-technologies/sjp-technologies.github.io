@@ -1,0 +1,38 @@
+<!doctype html>
+<html lang="bn">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="robots" content="noindex,nofollow">
+<meta name="theme-color" content="#07111f">
+<title>Admin Dashboard | SJP TECHNOLOGIES</title>
+<style>
+:root{color-scheme:dark;--bg:#07111f;--panel:#101f35;--line:#263b58;--muted:#9eb2ca;--cyan:#38d9ef;--white:#f3f8ff}
+*{box-sizing:border-box}body{margin:0;min-height:100vh;background:radial-gradient(ellipse at top,#142d4b 0,#07111f 58%);font-family:system-ui,-apple-system,"Noto Sans Bengali",sans-serif;color:var(--white);padding:28px 16px}
+main{max-width:920px;margin:0 auto}.top{display:flex;justify-content:space-between;align-items:center;gap:12px;margin-bottom:28px}.brand{font-weight:800;letter-spacing:1px}.brand small{display:block;color:var(--muted);font-size:11px;letter-spacing:3px}
+.pill{border:1px solid var(--line);border-radius:99px;padding:7px 12px;color:var(--muted);font-size:12px}
+h1{font-size:clamp(25px,5vw,38px);margin:0 0 8px}.sub{color:var(--muted);margin:0 0 24px}
+.card{background:linear-gradient(145deg,#142842,#0c192b);border:1px solid var(--line);border-radius:22px;padding:22px;box-shadow:0 18px 50px #0005}
+.login{max-width:430px;margin:8vh auto}.field{display:flex;gap:10px;flex-wrap:wrap}input{min-width:0;flex:1;background:#071321;border:1px solid #38506e;border-radius:12px;padding:14px;color:white;font:inherit}button{border:0;border-radius:12px;padding:13px 18px;background:linear-gradient(120deg,#12b9dc,#5865e8);color:white;font-weight:750;font:inherit;cursor:pointer}
+.grid{display:grid;grid-template-columns:repeat(3,1fr);gap:14px;margin:18px 0}.metric{background:#0b192a;border:1px solid var(--line);border-radius:17px;padding:19px}.label{color:var(--muted);font-size:13px}.value{font-size:clamp(27px,5vw,38px);font-weight:850;margin-top:8px;color:var(--cyan)}
+.note,.status{color:var(--muted);font-size:13px;line-height:1.7}.error{color:#ff9d9d}.hidden{display:none!important}.actions{display:flex;justify-content:space-between;align-items:center;gap:12px;margin-bottom:16px}
+@media(max-width:620px){.grid{grid-template-columns:1fr}.top{align-items:flex-start}}
+</style></head>
+<body><main>
+<div class="top"><div class="brand">SJP TECHNOLOGIES<small>PRIVATE ADMIN AREA</small></div><span class="pill">SECURE DASHBOARD</span></div>
+<section id="loginBox" class="card login"><h1>অ্যাডমিন লগইন</h1><p class="sub">এই প্যানেলটি শুধুমাত্র অনুমোদিত অ্যাডমিনের জন্য।</p>
+<form id="loginForm"><div class="field"><input id="password" type="password" placeholder="Admin password" autocomplete="current-password" required><button type="submit">লগইন</button></div></form><p id="loginMessage" class="status" role="status"></p></section>
+<section id="dashboard" class="hidden"><div class="actions"><div><h1>ওয়েবসাইট অ্যানালিটিক্স</h1><p class="sub" style="margin:5px 0 0">Visitor overview · Bangladesh time</p></div><button id="logout" type="button">লগআউট</button></div>
+<div class="grid"><article class="metric"><div class="label">সর্বমোট ইউনিক ভিজিটর</div><div id="total" class="value">—</div></article><article class="metric"><div class="label">আজকের ইউনিক ভিজিটর</div><div id="today" class="value">—</div></article><article class="metric"><div class="label">এখন অনলাইন</div><div id="online" class="value">—</div></article></div>
+<div class="card"><h2 style="margin:0 0 8px">রিপোর্টের অবস্থা</h2><p class="note">এই সংস্করণে Cloudflare-এর নিজস্ব visitor counter দেখানো হচ্ছে। দেশ, পেজভিত্তিক ভিজিট, ডিভাইস ও ব্রাউজারের বিস্তারিত রিপোর্ট GA4 Data API অনুমোদন যুক্ত হলে এখানে যোগ করা হবে। Google Analytics-এর Measurement ID একা এসব রিপোর্ট পড়ার অনুমতি দেয় না।</p><p id="updated" class="status">ডেটা লোড হচ্ছে…</p></div></section>
+</main>
+<script>
+const API="https://sjp-website-api.shahjalalpramanik-bpl.workers.dev",key="sjp_admin_session";
+const loginBox=document.getElementById("loginBox"),dashboard=document.getElementById("dashboard"),message=document.getElementById("loginMessage");
+function showDashboard(){loginBox.classList.add("hidden");dashboard.classList.remove("hidden");loadStats()}
+function showLogin(){dashboard.classList.add("hidden");loginBox.classList.remove("hidden")}
+async function loadStats(){const token=sessionStorage.getItem(key);if(!token)return showLogin();try{const r=await fetch(API+"/admin/stats",{headers:{Authorization:"Bearer "+token},cache:"no-store"});if(r.status===401){sessionStorage.removeItem(key);showLogin();message.textContent="সেশন শেষ হয়েছে। আবার লগইন করুন।";return}if(!r.ok)throw Error("ডেটা পাওয়া যায়নি");const d=await r.json();for(const [id,v] of [["total",d.totalVisitors],["today",d.todayVisitors],["online",d.currentlyOnline]])document.getElementById(id).textContent=Number(v||0).toLocaleString("bn-BD");document.getElementById("updated").textContent="সর্বশেষ আপডেট: "+new Date().toLocaleString("bn-BD",{timeZone:"Asia/Dhaka"})}catch(e){document.getElementById("updated").textContent="ডেটা লোড করা যায়নি। সংযোগ ও Worker deployment পরীক্ষা করুন।"}}
+document.getElementById("loginForm").addEventListener("submit",async e=>{e.preventDefault();message.textContent="যাচাই হচ্ছে…";message.className="status";try{const r=await fetch(API+"/admin/login",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({password:document.getElementById("password").value})});const d=await r.json();if(!r.ok)throw Error(d.error||"লগইন ব্যর্থ");sessionStorage.setItem(key,d.token);document.getElementById("password").value="";message.textContent="";showDashboard()}catch(err){message.textContent=err.message;message.className="status error"}});
+document.getElementById("logout").addEventListener("click",()=>{sessionStorage.removeItem(key);showLogin()});
+if(sessionStorage.getItem(key))showDashboard();
+setInterval(()=>{if(!dashboard.classList.contains("hidden"))loadStats()},30000);
+</script></body></html>
