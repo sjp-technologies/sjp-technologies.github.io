@@ -64,6 +64,23 @@ export default {
     for(const [key,value] of Object.entries(corsHeaders(request)))headers.set(key,value);
     return new Response(response.body,{status:response.status,statusText:response.statusText,headers});
   }
+  if(url.pathname==="/admin/site-content"&&(request.method==="GET"||request.method==="POST")){
+    if(request.headers.get("Origin")!==SITE_ORIGIN||!env.ADMIN_PASSWORD||!(await validToken(request,env.ADMIN_PASSWORD)))return json({error:"Unauthorized"},401,request);
+    const id=env.VISITOR_STORE.idFromName("global-visitor-store");
+    const init={method:request.method,headers:{"Content-Type":"application/json"}};
+    if(request.method==="POST")init.body=await request.text();
+    const response=await env.VISITOR_STORE.get(id).fetch(new Request(new URL("/content",request.url),init));
+    const headers=new Headers(response.headers);
+    for(const [key,value] of Object.entries(corsHeaders(request)))headers.set(key,value);
+    return new Response(response.body,{status:response.status,statusText:response.statusText,headers});
+  }
+  if(url.pathname==="/site-content"&&request.method==="GET"){
+    const id=env.VISITOR_STORE.idFromName("global-visitor-store");
+    const response=await env.VISITOR_STORE.get(id).fetch(new Request(new URL("/content",request.url),{method:"GET"}));
+    const headers=new Headers(response.headers);
+    for(const [key,value] of Object.entries(corsHeaders(request)))headers.set(key,value);
+    return new Response(response.body,{status:response.status,statusText:response.statusText,headers});
+  }
   if(url.pathname==="/site-config"&&request.method==="GET"){
     const id=env.VISITOR_STORE.idFromName("global-visitor-store");
     const response=await env.VISITOR_STORE.get(id).fetch(new Request(new URL("/config",request.url),{method:"GET"}));
@@ -171,6 +188,25 @@ export class VisitorStore {
       const value=JSON.stringify({enabled,text});
       this.ctx.storage.sql.exec("INSERT INTO site_config(config_key,config_value,updated_at) VALUES('announcement',?,?) ON CONFLICT(config_key) DO UPDATE SET config_value=excluded.config_value,updated_at=excluded.updated_at",value,now);
       return json({ok:true,announcement:{enabled,text,updatedAt:now}});
+    }
+    if(url.pathname==="/content"&&request.method==="GET"){
+      const row=this.ctx.storage.sql.exec("SELECT config_value, updated_at FROM site_config WHERE config_key = 'homepage_content'").toArray()[0];
+      let content={};
+      if(row){try{content={...JSON.parse(row.config_value),updatedAt:row.updated_at}}catch{}}
+      return json({content});
+    }
+    if(url.pathname==="/content"&&request.method==="POST"){
+      let body;try{body=await request.json()}catch{return json({error:"Invalid JSON"},400)}
+      const fields=["heroTitle","heroSubtitle","heroPrimaryButton","heroSecondaryButton","featuredTitle","featuredDescription","appDescription"];
+      const content={};
+      for(const field of fields){
+        const value=String(body[field]??"").trim();
+        if(value.length>500)return json({error:field+" সর্বোচ্চ ৫০০ অক্ষর হতে পারবে"},400);
+        content[field]=value;
+      }
+      const value=JSON.stringify(content);
+      this.ctx.storage.sql.exec("INSERT INTO site_config(config_key,config_value,updated_at) VALUES('homepage_content',?,?) ON CONFLICT(config_key) DO UPDATE SET config_value=excluded.config_value,updated_at=excluded.updated_at",value,now);
+      return json({ok:true,content:{...content,updatedAt:now}});
     }
     return json({ error: "Not found" }, 404);
   }
