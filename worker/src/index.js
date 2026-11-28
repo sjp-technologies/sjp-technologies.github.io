@@ -33,7 +33,30 @@ async function validToken(request,secret) {
     return payload.scope==="admin"&&Number(payload.exp)>Date.now();
   } catch { return false; }
 }
-export default {
+let ga4TokenCache = { token: "", expiresAt: 0 };
+function pemBytes(pem) {
+  const clean = pem.replace(/-----BEGIN PRIVATE KEY-----|-----END PRIVATE KEY-----|\\s/g, "");
+  return Uint8Array.from(atob(clean), ch => ch.charCodeAt(0));
+}
+function b64urlText(value) {
+  return b64url(enc.encode(value));
+}
+async function getGa4AccessToken(serviceAccount) {
+  if (ga4TokenCache.token && ga4TokenCache.expiresAt > Date.now() + 60000) return ga4TokenCache.token;
+  const header = b64urlText(JSON.stringify({ alg: "RS256", typ: "JWT" }));
+  const now = Math.floor(Date.now() / 1000);
+  const claims = b64urlText(JSON.stringify({ iss: serviceAccount.client_email, scope: "https://www.googleapis.com/auth/analytics.readonly", aud: "https://oauth2.googleapis.com/token", iat: now, exp: now + 3600 }));
+  const unsigned = header + "." + claims;
+  const key = await crypto.subtle.importKey("pkcs8", pemBytes(serviceAccount.private_key), { name: "RSASSA-PKCS1-v1_5", hash: "SHA-256" }, false, ["sign"]);
+  const signature = new Uint8Array(await crypto.subtle.sign("RSASSA-PKCS1-v1_5", key, enc.encode(unsigned)));
+  const assertion = unsigned + "." + b64url(signature);
+  const response = await fetch("https://oauth2.googleapis.com/token", { method: "POST", headers: { "Content-Type": "application/x-www-form-urlencoded" }, body: new URLSearchParams({ grant_type: "urn:ietf:params:oauth:grant-type:jwt-bearer", assertion }) });
+  const data = await response.json();
+  if (!response.ok || !data.access_token) throw new Error("GA4 OAuth failed: " + (data.error_description || data.error || response.status));
+  ga4TokenCache = { token: data.access_token, expiresAt: Date.now() + Number(data.expires_in || 3600) * 1000 };
+  return data.access_token;
+}
+\nexport default {
  async fetch(request,env) {
   const url=new URL(request.url);
   if(request.method==="OPTIONS")return new Response(null,{headers:corsHeaders(request)});
@@ -45,6 +68,21 @@ export default {
     const supplied=String(body.password||"");
     if(supplied.length<1||supplied.length>200||supplied!==env.ADMIN_PASSWORD)return json({error:"ভুল পাসওয়ার্ড"},401,request);
     return json({ok:true,token:await issueToken(env.ADMIN_PASSWORD),expiresIn:28800},200,request);
+  }
+  if(url.pathname==="/admin/ga4-report"&&request.method==="POST"){
+    if(request.headers.get("Origin")!==SITE_ORIGIN||!env.ADMIN_PASSWORD||!(await validToken(request,env.ADMIN_PASSWORD)))return json({error:"Unauthorized"},401,request);
+    if(!env.GA4_PROPERTY_ID||!env.GA4_SERVICE_ACCOUNT_JSON)return json({error:"GA4_PROPERTY_ID এবং GA4_SERVICE_ACCOUNT_JSON Worker secrets-এ সেট করতে হবে"},503,request);
+    let body;try{body=await request.json()}catch{return json({error:"Invalid JSON"},400,request)}
+    const startDate=String(body.startDate||"7daysAgo"),endDate=String(body.endDate||"today");
+    if(!/^(\\d{4}-\\d{2}-\\d{2}|\\d+daysAgo|today|yesterday)$/.test(startDate)||!/^(\\d{4}-\\d{2}-\\d{2}|\\d+daysAgo|today|yesterday)$/.test(endDate))return json({error:"Invalid date range"},400,request);
+    try{
+      const account=JSON.parse(env.GA4_SERVICE_ACCOUNT_JSON);
+      const token=await getGa4AccessToken(account);
+      const response=await fetch("https://analyticsdata.googleapis.com/v1beta/properties/"+encodeURIComponent(env.GA4_PROPERTY_ID)+":runReport",{method:"POST",headers:{Authorization:"Bearer "+token,"Content-Type":"application/json"},body:JSON.stringify({dateRanges:[{startDate,endDate}],dimensions:[{name:"date"},{name:"pagePath"}],metrics:[{name:"activeUsers"},{name:"sessions"},{name:"screenPageViews"},{name:"engagementRate"}],limit:10000})});
+      const data=await response.json();
+      if(!response.ok)return json({error:"GA4 API error",details:data.error?.message||response.status},502,request);
+      return json({ok:true,propertyId:env.GA4_PROPERTY_ID,rows:data.rows||[],totals:data.totals||[],rowCount:data.rowCount||0,dimensionHeaders:data.dimensionHeaders||[],metricHeaders:data.metricHeaders||[]},200,request);
+    }catch(e){return json({error:"GA4 report failed",details:String(e.message||e)},502,request)}
   }
   if(url.pathname==="/admin/stats"&&request.method==="GET"){
     if(request.headers.get("Origin")!==SITE_ORIGIN||!env.ADMIN_PASSWORD||!(await validToken(request,env.ADMIN_PASSWORD)))return json({error:"Unauthorized"},401,request);
