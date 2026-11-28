@@ -63,6 +63,14 @@ export default {
     for(const [key,value] of Object.entries(corsHeaders(request)))headers.set(key,value);
     return new Response(response.body,{status:response.status,headers});
   }
+  if(url.pathname==="/admin/restore"&&request.method==="POST"){
+    if(request.headers.get("Origin")!==SITE_ORIGIN||!env.ADMIN_PASSWORD||!(await validToken(request,env.ADMIN_PASSWORD)))return json({error:"Unauthorized"},401,request);
+    let body;try{body=await request.json()}catch{return json({error:"Invalid JSON"},400,request)}
+    const id=env.VISITOR_STORE.idFromName("global-visitor-store");
+    const response=await env.VISITOR_STORE.get(id).fetch(new Request(new URL("/restore",request.url),{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(body)}));
+    const headers=new Headers(response.headers);for(const [key,value] of Object.entries(corsHeaders(request)))headers.set(key,value);
+    return new Response(response.body,{status:response.status,headers});
+  }
   if(url.pathname==="/admin/site-config"&&(request.method==="GET"||request.method==="POST")){
     if(request.headers.get("Origin")!==SITE_ORIGIN||!env.ADMIN_PASSWORD||!(await validToken(request,env.ADMIN_PASSWORD)))return json({error:"Unauthorized"},401,request);
     const id=env.VISITOR_STORE.idFromName("global-visitor-store");
@@ -186,7 +194,33 @@ export class VisitorStore {
       });
     }
     if(url.pathname==="/audit"&&request.method==="GET"){const rows=this.ctx.storage.sql.exec("SELECT id,action,config_key,changed_at,summary FROM admin_audit ORDER BY id DESC LIMIT 100").toArray();return json({items:rows});}
-    if(url.pathname==="/backup"&&request.method==="GET"){const rows=this.ctx.storage.sql.exec("SELECT config_key,config_value,updated_at FROM site_config ORDER BY config_key").toArray();return json({format:"sjp-website-backup-v1",createdAt:now,timezone:"Asia/Dhaka",siteConfig:rows});}
+    if(url.pathname==="/backup"&&request.method==="GET"){
+      const siteConfig=this.ctx.storage.sql.exec("SELECT config_key,config_value,updated_at FROM site_config ORDER BY config_key").toArray();
+      const visitors=this.ctx.storage.sql.exec("SELECT visitor_id,first_seen,last_seen FROM visitors ORDER BY visitor_id").toArray();
+      const dailyVisits=this.ctx.storage.sql.exec("SELECT visitor_id,visit_day FROM daily_visits ORDER BY visit_day,visitor_id").toArray();
+      const audit=this.ctx.storage.sql.exec("SELECT id,action,config_key,changed_at,summary FROM admin_audit ORDER BY id").toArray();
+      return json({format:"sjp-website-backup-v2",createdAt:now,timezone:"Asia/Dhaka",scope:["site_config","visitors","daily_visits","admin_audit"],siteConfig,visitors,dailyVisits,audit});
+    }
+    if(url.pathname==="/restore"&&request.method==="POST"){
+      let b;try{b=await request.json()}catch{return json({error:"Invalid JSON"},400)}
+      if(b.format!=="sjp-website-backup-v2"||!Array.isArray(b.siteConfig)||!Array.isArray(b.visitors)||!Array.isArray(b.dailyVisits)||!Array.isArray(b.audit))return json({error:"Backup format invalid or incomplete"},400);
+      if(b.siteConfig.length>500||b.visitors.length>200000||b.dailyVisits.length>500000||b.audit.length>100000)return json({error:"Backup exceeds safe limits"},413);
+      for(const x of b.siteConfig)if(typeof x.config_key!=="string"||typeof x.config_value!=="string"||!Number.isFinite(Number(x.updated_at)))return json({error:"Invalid site config row"},400);
+      for(const x of b.visitors)if(typeof x.visitor_id!=="string"||!Number.isFinite(Number(x.first_seen))||!Number.isFinite(Number(x.last_seen)))return json({error:"Invalid visitor row"},400);
+      for(const x of b.dailyVisits)if(typeof x.visitor_id!=="string"||typeof x.visit_day!=="string")return json({error:"Invalid daily visit row"},400);
+      for(const x of b.audit)if(typeof x.action!=="string"||typeof x.config_key!=="string"||!Number.isFinite(Number(x.changed_at))||typeof x.summary!=="string")return json({error:"Invalid audit row"},400);
+      try{
+        this.ctx.storage.sql.exec("BEGIN");
+        this.ctx.storage.sql.exec("DELETE FROM site_config");this.ctx.storage.sql.exec("DELETE FROM visitors");this.ctx.storage.sql.exec("DELETE FROM daily_visits");this.ctx.storage.sql.exec("DELETE FROM admin_audit");
+        for(const x of b.siteConfig)this.ctx.storage.sql.exec("INSERT INTO site_config(config_key,config_value,updated_at) VALUES(?,?,?)",x.config_key,x.config_value,Number(x.updated_at));
+        for(const x of b.visitors)this.ctx.storage.sql.exec("INSERT INTO visitors(visitor_id,first_seen,last_seen) VALUES(?,?,?)",x.visitor_id,Number(x.first_seen),Number(x.last_seen));
+        for(const x of b.dailyVisits)this.ctx.storage.sql.exec("INSERT INTO daily_visits(visitor_id,visit_day) VALUES(?,?)",x.visitor_id,x.visit_day);
+        for(const x of b.audit)this.ctx.storage.sql.exec("INSERT INTO admin_audit(action,config_key,changed_at,summary) VALUES(?,?,?,?)",x.action,x.config_key,Number(x.changed_at),x.summary);
+        this.ctx.storage.sql.exec("COMMIT");
+        this.ctx.storage.sql.exec("INSERT INTO admin_audit(action,config_key,changed_at,summary) VALUES(?,?,?,?)","RESTORE","full_database",now,"Full website database restored from v2 backup");
+        return json({ok:true,restored:{siteConfig:b.siteConfig.length,visitors:b.visitors.length,dailyVisits:b.dailyVisits.length,audit:b.audit.length}});
+      }catch(e){try{this.ctx.storage.sql.exec("ROLLBACK")}catch{};return json({error:"Restore failed; database rollback attempted"},500)}
+    }
     if(url.pathname==="/config"&&request.method==="GET"){
       const row=this.ctx.storage.sql.exec("SELECT config_value, updated_at FROM site_config WHERE config_key = 'announcement'").toArray()[0];
       let announcement={enabled:false,text:"",updatedAt:null};
