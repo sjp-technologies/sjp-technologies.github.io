@@ -54,6 +54,15 @@ export default {
     for (const [key,value] of Object.entries(corsHeaders(request))) headers.set(key,value);
     return new Response(response.body,{status:response.status,statusText:response.statusText,headers});
   }
+  if((url.pathname==="/admin/audit"||url.pathname==="/admin/backup")&&request.method==="GET"){
+    if(request.headers.get("Origin")!==SITE_ORIGIN||!env.ADMIN_PASSWORD||!(await validToken(request,env.ADMIN_PASSWORD)))return json({error:"Unauthorized"},401,request);
+    const id=env.VISITOR_STORE.idFromName("global-visitor-store");
+    const target=url.pathname==="/admin/audit"?"/audit":"/backup";
+    const response=await env.VISITOR_STORE.get(id).fetch(new Request(new URL(target,request.url),{method:"GET"}));
+    const headers=new Headers(response.headers);
+    for(const [key,value] of Object.entries(corsHeaders(request)))headers.set(key,value);
+    return new Response(response.body,{status:response.status,headers});
+  }
   if(url.pathname==="/admin/site-config"&&(request.method==="GET"||request.method==="POST")){
     if(request.headers.get("Origin")!==SITE_ORIGIN||!env.ADMIN_PASSWORD||!(await validToken(request,env.ADMIN_PASSWORD)))return json({error:"Unauthorized"},401,request);
     const id=env.VISITOR_STORE.idFromName("global-visitor-store");
@@ -98,6 +107,8 @@ export default {
 /* Durable Object that stores visitor counts. */
 export class VisitorStore {
   constructor(ctx) {
+    this.ctx.storage.sql.exec("CREATE TABLE IF NOT EXISTS admin_audit (id INTEGER PRIMARY KEY AUTOINCREMENT, action TEXT NOT NULL, config_key TEXT NOT NULL, changed_at INTEGER NOT NULL, summary TEXT NOT NULL)");
+
     this.ctx = ctx;
     this.ctx.storage.sql.exec(`
       CREATE TABLE IF NOT EXISTS visitors (
@@ -174,6 +185,8 @@ export class VisitorStore {
         timezone: "Asia/Dhaka"
       });
     }
+    if(url.pathname==="/audit"&&request.method==="GET"){const rows=this.ctx.storage.sql.exec("SELECT id,action,config_key,changed_at,summary FROM admin_audit ORDER BY id DESC LIMIT 100").toArray();return json({items:rows});}
+    if(url.pathname==="/backup"&&request.method==="GET"){const rows=this.ctx.storage.sql.exec("SELECT config_key,config_value,updated_at FROM site_config ORDER BY config_key").toArray();return json({format:"sjp-website-backup-v1",createdAt:now,timezone:"Asia/Dhaka",siteConfig:rows});}
     if(url.pathname==="/config"&&request.method==="GET"){
       const row=this.ctx.storage.sql.exec("SELECT config_value, updated_at FROM site_config WHERE config_key = 'announcement'").toArray()[0];
       let announcement={enabled:false,text:"",updatedAt:null};
