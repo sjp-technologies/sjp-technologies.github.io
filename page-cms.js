@@ -14,7 +14,7 @@
   try{
     const r=await fetch(API+"/page-cms",{cache:"no-store"});if(!r.ok)return;
     const d=await r.json(),p=(d.pages||{})[slug];if(!p)return;
-    if(p.title){document.title=p.title;const e=first(selectors.title);if(e)e.textContent=p.title;}
+    if(p.title){document.title=p.title;}
     for(const key of ["heroText","introText","sectionTitle","sectionText"]){
       const value=String(p[key]||"").trim(),e=first(selectors[key]);if(value&&e)e.textContent=value;
     }
