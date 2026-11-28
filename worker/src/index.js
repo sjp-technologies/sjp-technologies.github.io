@@ -54,6 +54,23 @@ export default {
     for (const [key,value] of Object.entries(corsHeaders(request))) headers.set(key,value);
     return new Response(response.body,{status:response.status,statusText:response.statusText,headers});
   }
+  if(url.pathname==="/admin/site-config"&&(request.method==="GET"||request.method==="POST")){
+    if(request.headers.get("Origin")!==SITE_ORIGIN||!env.ADMIN_PASSWORD||!(await validToken(request,env.ADMIN_PASSWORD)))return json({error:"Unauthorized"},401,request);
+    const id=env.VISITOR_STORE.idFromName("global-visitor-store");
+    const init={method:request.method,headers:{"Content-Type":"application/json"}};
+    if(request.method==="POST")init.body=await request.text();
+    const response=await env.VISITOR_STORE.get(id).fetch(new Request(new URL("/config",request.url),init));
+    const headers=new Headers(response.headers);
+    for(const [key,value] of Object.entries(corsHeaders(request)))headers.set(key,value);
+    return new Response(response.body,{status:response.status,statusText:response.statusText,headers});
+  }
+  if(url.pathname==="/site-config"&&request.method==="GET"){
+    const id=env.VISITOR_STORE.idFromName("global-visitor-store");
+    const response=await env.VISITOR_STORE.get(id).fetch(new Request(new URL("/config",request.url),{method:"GET"}));
+    const headers=new Headers(response.headers);
+    for(const [key,value] of Object.entries(corsHeaders(request)))headers.set(key,value);
+    return new Response(response.body,{status:response.status,statusText:response.statusText,headers});
+  }
   if(!["/visit","/heartbeat","/stats"].includes(url.pathname))return json({error:"Not found"},404,request);
   const id=env.VISITOR_STORE.idFromName("global-visitor-store");
   return env.VISITOR_STORE.get(id).fetch(request);
@@ -77,6 +94,13 @@ export class VisitorStore {
         visitor_id TEXT NOT NULL,
         visit_day TEXT NOT NULL,
         PRIMARY KEY (visitor_id, visit_day)
+      )
+    `);
+    this.ctx.storage.sql.exec(`
+      CREATE TABLE IF NOT EXISTS site_config (
+        config_key TEXT PRIMARY KEY,
+        config_value TEXT NOT NULL,
+        updated_at INTEGER NOT NULL
       )
     `);
   }
@@ -132,6 +156,21 @@ export class VisitorStore {
         onlineWindowSeconds: 90,
         timezone: "Asia/Dhaka"
       });
+    }
+    if(url.pathname==="/config"&&request.method==="GET"){
+      const row=this.ctx.storage.sql.exec("SELECT config_value, updated_at FROM site_config WHERE config_key = 'announcement'").toArray()[0];
+      let announcement={enabled:false,text:"",updatedAt:null};
+      if(row){try{announcement={...JSON.parse(row.config_value),updatedAt:row.updated_at}}catch{}}
+      return json({announcement});
+    }
+    if(url.pathname==="/config"&&request.method==="POST"){
+      let body;try{body=await request.json()}catch{return json({error:"Invalid JSON"},400)}
+      const text=String(body.text||"").trim();
+      const enabled=body.enabled===true;
+      if(text.length>300)return json({error:"নোটিশ সর্বোচ্চ ৩০০ অক্ষরের হতে পারবে"},400);
+      const value=JSON.stringify({enabled,text});
+      this.ctx.storage.sql.exec("INSERT INTO site_config(config_key,config_value,updated_at) VALUES('announcement',?,?) ON CONFLICT(config_key) DO UPDATE SET config_value=excluded.config_value,updated_at=excluded.updated_at",value,now);
+      return json({ok:true,announcement:{enabled,text,updatedAt:now}});
     }
     return json({ error: "Not found" }, 404);
   }
