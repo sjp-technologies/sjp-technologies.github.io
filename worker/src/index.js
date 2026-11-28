@@ -1,4 +1,5 @@
 const SITE_ORIGIN = "https://sjp-technologies.github.io";
+const enc = new TextEncoder();
 const corsHeaders = (request) => ({
   "Access-Control-Allow-Origin": request.headers.get("Origin") === SITE_ORIGIN ? SITE_ORIGIN : "null",
   "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
@@ -8,7 +9,7 @@ const corsHeaders = (request) => ({
 });
 function json(data,status=200,request=null) { const headers=request?corsHeaders(request):{"Access-Control-Allow-Origin":"*","Content-Type":"application/json; charset=utf-8"}; return new Response(JSON.stringify(data),{status,headers}); }
 function b64url(bytes) { let s=""; for(const b of bytes)s+=String.fromCharCode(b); return btoa(s).replace(/=/g,"").replace(/\+/g,"-").replace(/\//g,"_"); }
-function b64url(bytes) { let s=""; for(const b of bytes)s+=String.fromCharCode(b); return btoa(s).replace(/=/g,"").replace(/\\+/g,"-").replace(/\\//g,"_"); }
+
 function unb64url(s) { s=s.replace(/-/g,"+").replace(/_/g,"/"); return Uint8Array.from(atob(s+"=".repeat((4-s.length%4)%4)),c=>c.charCodeAt(0)); }
 async function hmac(secret,data) {
   const key=await crypto.subtle.importKey("raw",enc.encode(secret),{name:"HMAC",hash:"SHA-256"},false,["sign","verify"]);
@@ -48,7 +49,10 @@ export default {
   if(url.pathname==="/admin/stats"&&request.method==="GET"){
     if(request.headers.get("Origin")!==SITE_ORIGIN||!env.ADMIN_PASSWORD||!(await validToken(request,env.ADMIN_PASSWORD)))return json({error:"Unauthorized"},401,request);
     const id=env.VISITOR_STORE.idFromName("global-visitor-store");
-    return env.VISITOR_STORE.get(id).fetch(new Request(new URL("/stats",request.url),{method:"GET"}));
+    const response = await env.VISITOR_STORE.get(id).fetch(new Request(new URL("/stats",request.url),{method:"GET"}));
+    const headers = new Headers(response.headers);
+    for (const [key,value] of Object.entries(corsHeaders(request))) headers.set(key,value);
+    return new Response(response.body,{status:response.status,statusText:response.statusText,headers});
   }
   if(!["/visit","/heartbeat","/stats"].includes(url.pathname))return json({error:"Not found"},404,request);
   const id=env.VISITOR_STORE.idFromName("global-visitor-store");
