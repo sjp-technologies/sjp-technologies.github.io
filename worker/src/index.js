@@ -131,7 +131,8 @@ export default {
 export class VisitorStore {
   constructor(ctx) {
     this.ctx = ctx;
-    this.ctx.storage.sql.exec("CREATE TABLE IF NOT EXISTS admin_audit (id INTEGER PRIMARY KEY AUTOINCREMENT, action TEXT NOT NULL, config_key TEXT NOT NULL, changed_at INTEGER NOT NULL, summary TEXT NOT NULL)");
+    this.ctx.storage.sql.exec("CREATE TABLE IF NOT EXISTS admin_audit (id INTEGER PRIMARY KEY AUTOINCREMENT, action TEXT NOT NULL, config_key TEXT NOT NULL, changed_at INTEGER NOT NULL, summary TEXT NOT NULL, actor TEXT NOT NULL DEFAULT 'owner', before_value TEXT, after_value TEXT)");
+    for (const migration of ["ALTER TABLE admin_audit ADD COLUMN actor TEXT NOT NULL DEFAULT 'owner'", "ALTER TABLE admin_audit ADD COLUMN before_value TEXT", "ALTER TABLE admin_audit ADD COLUMN after_value TEXT"]) { try { this.ctx.storage.sql.exec(migration); } catch {} }
     this.ctx.storage.sql.exec(`
       CREATE TABLE IF NOT EXISTS visitors (
         visitor_id TEXT PRIMARY KEY,
@@ -207,12 +208,12 @@ export class VisitorStore {
         timezone: "Asia/Dhaka"
       });
     }
-    if(url.pathname==="/audit"&&request.method==="GET"){const rows=this.ctx.storage.sql.exec("SELECT id,action,config_key,changed_at,summary FROM admin_audit ORDER BY id DESC LIMIT 100").toArray();return json({items:rows});}
+    if(url.pathname==="/audit"&&request.method==="GET"){const rows=this.ctx.storage.sql.exec("SELECT id,action,config_key,changed_at,summary,actor,before_value,after_value FROM admin_audit ORDER BY id DESC LIMIT 200").toArray();return json({items:rows});}
     if(url.pathname==="/backup"&&request.method==="GET"){
       const siteConfig=this.ctx.storage.sql.exec("SELECT config_key,config_value,updated_at FROM site_config ORDER BY config_key").toArray();
       const visitors=this.ctx.storage.sql.exec("SELECT visitor_id,first_seen,last_seen FROM visitors ORDER BY visitor_id").toArray();
       const dailyVisits=this.ctx.storage.sql.exec("SELECT visitor_id,visit_day FROM daily_visits ORDER BY visit_day,visitor_id").toArray();
-      const audit=this.ctx.storage.sql.exec("SELECT id,action,config_key,changed_at,summary FROM admin_audit ORDER BY id").toArray();
+      const audit=this.ctx.storage.sql.exec("SELECT id,action,config_key,changed_at,summary,actor,before_value,after_value FROM admin_audit ORDER BY id").toArray();
       return json({format:"sjp-website-backup-v2",createdAt:now,timezone:"Asia/Dhaka",scope:["site_config","visitors","daily_visits","admin_audit"],siteConfig,visitors,dailyVisits,audit});
     }
     if(url.pathname==="/restore"&&request.method==="POST"){
@@ -229,9 +230,9 @@ export class VisitorStore {
         for(const x of b.siteConfig)this.ctx.storage.sql.exec("INSERT INTO site_config(config_key,config_value,updated_at) VALUES(?,?,?)",x.config_key,x.config_value,Number(x.updated_at));
         for(const x of b.visitors)this.ctx.storage.sql.exec("INSERT INTO visitors(visitor_id,first_seen,last_seen) VALUES(?,?,?)",x.visitor_id,Number(x.first_seen),Number(x.last_seen));
         for(const x of b.dailyVisits)this.ctx.storage.sql.exec("INSERT INTO daily_visits(visitor_id,visit_day) VALUES(?,?)",x.visitor_id,x.visit_day);
-        for(const x of b.audit)this.ctx.storage.sql.exec("INSERT INTO admin_audit(action,config_key,changed_at,summary) VALUES(?,?,?,?)",x.action,x.config_key,Number(x.changed_at),x.summary);
+        for(const x of b.audit)this.ctx.storage.sql.exec("INSERT INTO admin_audit(action,config_key,changed_at,summary,actor,before_value,after_value) VALUES(?,?,?,?,?,?,?)",x.action,x.config_key,Number(x.changed_at),x.summary,String(x.actor||"owner"),x.before_value??null,x.after_value??null);
         this.ctx.storage.sql.exec("COMMIT");
-        this.ctx.storage.sql.exec("INSERT INTO admin_audit(action,config_key,changed_at,summary) VALUES(?,?,?,?)","RESTORE","full_database",now,"Full website database restored from v2 backup");
+        this.ctx.storage.sql.exec("INSERT INTO admin_audit(action,config_key,changed_at,summary,actor,after_value) VALUES(?,?,?,?,?,?)","RESTORE","full_database",now,"Full website database restored from v2 backup","owner",JSON.stringify({siteConfig:b.siteConfig.length,visitors:b.visitors.length,dailyVisits:b.dailyVisits.length,audit:b.audit.length}));
         return json({ok:true,restored:{siteConfig:b.siteConfig.length,visitors:b.visitors.length,dailyVisits:b.dailyVisits.length,audit:b.audit.length}});
       }catch(e){try{this.ctx.storage.sql.exec("ROLLBACK")}catch{};return json({error:"Restore failed; database rollback attempted"},500)}
     }
@@ -247,9 +248,10 @@ export class VisitorStore {
       const fields=["title","heroText","introText","sectionTitle","sectionText"];
       const row=this.ctx.storage.sql.exec("SELECT config_value FROM site_config WHERE config_key='page_cms'").toArray()[0];
       let pages={};if(row){try{pages=JSON.parse(row.config_value)}catch{}}
+      const before=pages[body.page]||null;
       const content={};for(const f of fields){const v=String(body[f]??"").trim();if(v.length>1200)return json({error:f+" সর্বোচ্চ ১২০০ অক্ষর"},400);content[f]=v;}
       pages[body.page]=content;const value=JSON.stringify(pages);
-      this.ctx.storage.sql.exec("INSERT INTO admin_audit(action,config_key,changed_at,summary) VALUES(?,?,?,?)","UPDATE","page_cms:"+body.page,now,"Page CMS updated: "+body.page);
+      this.ctx.storage.sql.exec("INSERT INTO admin_audit(action,config_key,changed_at,summary,actor,before_value,after_value) VALUES(?,?,?,?,?,?,?)","UPDATE","page_cms:"+body.page,now,"Page CMS updated: "+body.page,"owner",before===null?null:JSON.stringify(before),JSON.stringify(content));
       this.ctx.storage.sql.exec("INSERT INTO site_config(config_key,config_value,updated_at) VALUES('page_cms',?,?) ON CONFLICT(config_key) DO UPDATE SET config_value=excluded.config_value,updated_at=excluded.updated_at",value,now);
       return json({ok:true,page:body.page,content,updatedAt:now});
     }
@@ -265,7 +267,8 @@ export class VisitorStore {
       const enabled=body.enabled===true;
       if(text.length>300)return json({error:"নোটিশ সর্বোচ্চ ৩০০ অক্ষরের হতে পারবে"},400);
       const value=JSON.stringify({enabled,text});
-      this.ctx.storage.sql.exec("INSERT INTO admin_audit(action,config_key,changed_at,summary) VALUES(?,?,?,?)","UPDATE","announcement",now,"Notice updated");
+      const previous=this.ctx.storage.sql.exec("SELECT config_value FROM site_config WHERE config_key = 'announcement'").toArray()[0]?.config_value??null;
+      this.ctx.storage.sql.exec("INSERT INTO admin_audit(action,config_key,changed_at,summary,actor,before_value,after_value) VALUES(?,?,?,?,?,?,?)","UPDATE","announcement",now,"Notice updated","owner",previous,value);
       this.ctx.storage.sql.exec("INSERT INTO site_config(config_key,config_value,updated_at) VALUES('announcement',?,?) ON CONFLICT(config_key) DO UPDATE SET config_value=excluded.config_value,updated_at=excluded.updated_at",value,now);
       return json({ok:true,announcement:{enabled,text,updatedAt:now}});
     }
@@ -285,7 +288,8 @@ export class VisitorStore {
         content[field]=value;
       }
       const value=JSON.stringify(content);
-      this.ctx.storage.sql.exec("INSERT INTO admin_audit(action,config_key,changed_at,summary) VALUES(?,?,?,?)","UPDATE","homepage_content",now,"Homepage CMS updated");
+      const previous=this.ctx.storage.sql.exec("SELECT config_value FROM site_config WHERE config_key = 'homepage_content'").toArray()[0]?.config_value??null;
+      this.ctx.storage.sql.exec("INSERT INTO admin_audit(action,config_key,changed_at,summary,actor,before_value,after_value) VALUES(?,?,?,?,?,?,?)","UPDATE","homepage_content",now,"Homepage CMS updated","owner",previous,value);
       this.ctx.storage.sql.exec("INSERT INTO site_config(config_key,config_value,updated_at) VALUES('homepage_content',?,?) ON CONFLICT(config_key) DO UPDATE SET config_value=excluded.config_value,updated_at=excluded.updated_at",value,now);
       return json({ok:true,content:{...content,updatedAt:now}});
     }
