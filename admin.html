@@ -55,6 +55,7 @@ document.getElementById("systemCheck").addEventListener("click",async()=>{
  await check("Worker Health","/health",false);
  await check("Admin Stats API","/admin/stats");
  await check("Multi-page CMS API","/admin/page-cms");
+ try{const d=await secureGet("/admin/diagnostics");const c=d.counts||{};checks.push("✓ Database/CMS diagnostics — Config "+(c.siteConfig??0)+", CMS pages "+(c.cmsPages??0)+", Visitors "+(c.visitors??0)+", Daily visits "+(c.dailyVisits??0)+", Audit "+(c.audit??0));if(!c.siteConfig)checks.push("⚠ CMS/Config database empty; save a CMS page then rerun diagnostics.");}catch(e){checks.push("✕ Database/CMS diagnostics — "+e.message)}
  out.textContent=checks.join("\n")+"\nপরীক্ষার সময়: "+new Date().toLocaleString("bn-BD",{timeZone:"Asia/Dhaka"});await logAdminAction("SYSTEM_DIAGNOSTICS",checks.join("; "));
 });
 
