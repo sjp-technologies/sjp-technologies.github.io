@@ -115,9 +115,8 @@ export default {
 /* Durable Object that stores visitor counts. */
 export class VisitorStore {
   constructor(ctx) {
-    this.ctx.storage.sql.exec("CREATE TABLE IF NOT EXISTS admin_audit (id INTEGER PRIMARY KEY AUTOINCREMENT, action TEXT NOT NULL, config_key TEXT NOT NULL, changed_at INTEGER NOT NULL, summary TEXT NOT NULL)");
-
     this.ctx = ctx;
+    this.ctx.storage.sql.exec("CREATE TABLE IF NOT EXISTS admin_audit (id INTEGER PRIMARY KEY AUTOINCREMENT, action TEXT NOT NULL, config_key TEXT NOT NULL, changed_at INTEGER NOT NULL, summary TEXT NOT NULL)");
     this.ctx.storage.sql.exec(`
       CREATE TABLE IF NOT EXISTS visitors (
         visitor_id TEXT PRIMARY KEY,
