@@ -35,7 +35,7 @@ async function validToken(request,secret) {
 }
 let ga4TokenCache = { token: "", expiresAt: 0 };
 function pemBytes(pem) {
-  const clean = pem.replace(/-----BEGIN PRIVATE KEY-----|-----END PRIVATE KEY-----|\\s/g, "");
+  const clean = pem.replace(/-----BEGIN PRIVATE KEY-----|-----END PRIVATE KEY-----|\s/g, "");
   return Uint8Array.from(atob(clean), ch => ch.charCodeAt(0));
 }
 function b64urlText(value) {
@@ -56,7 +56,8 @@ async function getGa4AccessToken(serviceAccount) {
   ga4TokenCache = { token: data.access_token, expiresAt: Date.now() + Number(data.expires_in || 3600) * 1000 };
   return data.access_token;
 }
-\nexport default {
+
+export default {
  async fetch(request,env) {
   const url=new URL(request.url);
   if(request.method==="OPTIONS")return new Response(null,{headers:corsHeaders(request)});
@@ -74,7 +75,7 @@ async function getGa4AccessToken(serviceAccount) {
     if(!env.GA4_PROPERTY_ID||!env.GA4_SERVICE_ACCOUNT_JSON)return json({error:"GA4_PROPERTY_ID এবং GA4_SERVICE_ACCOUNT_JSON Worker secrets-এ সেট করতে হবে"},503,request);
     let body;try{body=await request.json()}catch{return json({error:"Invalid JSON"},400,request)}
     const startDate=String(body.startDate||"7daysAgo"),endDate=String(body.endDate||"today");
-    if(!/^(\\d{4}-\\d{2}-\\d{2}|\\d+daysAgo|today|yesterday)$/.test(startDate)||!/^(\\d{4}-\\d{2}-\\d{2}|\\d+daysAgo|today|yesterday)$/.test(endDate))return json({error:"Invalid date range"},400,request);
+    if(!/^(\d{4}-\d{2}-\d{2}|\d+daysAgo|today|yesterday)$/.test(startDate)||!/^(\d{4}-\d{2}-\d{2}|\d+daysAgo|today|yesterday)$/.test(endDate))return json({error:"Invalid date range"},400,request);
     try{
       const account=JSON.parse(env.GA4_SERVICE_ACCOUNT_JSON);
       const token=await getGa4AccessToken(account);
