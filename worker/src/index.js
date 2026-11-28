@@ -81,6 +81,21 @@ export default {
     for(const [key,value] of Object.entries(corsHeaders(request)))headers.set(key,value);
     return new Response(response.body,{status:response.status,statusText:response.statusText,headers});
   }
+  if(url.pathname==="/admin/page-cms"&&(request.method==="GET"||request.method==="POST")){
+    if(request.headers.get("Origin")!==SITE_ORIGIN||!env.ADMIN_PASSWORD||!(await validToken(request,env.ADMIN_PASSWORD)))return json({error:"Unauthorized"},401,request);
+    const id=env.VISITOR_STORE.idFromName("global-visitor-store");
+    const init={method:request.method,headers:{"Content-Type":"application/json"}};
+    if(request.method==="POST")init.body=await request.text();
+    const response=await env.VISITOR_STORE.get(id).fetch(new Request(new URL("/pages",request.url),init));
+    const headers=new Headers(response.headers);for(const [key,value] of Object.entries(corsHeaders(request)))headers.set(key,value);
+    return new Response(response.body,{status:response.status,headers});
+  }
+  if(url.pathname==="/page-cms"&&request.method==="GET"){
+    const id=env.VISITOR_STORE.idFromName("global-visitor-store");
+    const response=await env.VISITOR_STORE.get(id).fetch(new Request(new URL("/pages",request.url),{method:"GET"}));
+    const headers=new Headers(response.headers);for(const [key,value] of Object.entries(corsHeaders(request)))headers.set(key,value);
+    return new Response(response.body,{status:response.status,headers});
+  }
   if(url.pathname==="/admin/site-content"&&(request.method==="GET"||request.method==="POST")){
     if(request.headers.get("Origin")!==SITE_ORIGIN||!env.ADMIN_PASSWORD||!(await validToken(request,env.ADMIN_PASSWORD)))return json({error:"Unauthorized"},401,request);
     const id=env.VISITOR_STORE.idFromName("global-visitor-store");
@@ -219,6 +234,24 @@ export class VisitorStore {
         this.ctx.storage.sql.exec("INSERT INTO admin_audit(action,config_key,changed_at,summary) VALUES(?,?,?,?)","RESTORE","full_database",now,"Full website database restored from v2 backup");
         return json({ok:true,restored:{siteConfig:b.siteConfig.length,visitors:b.visitors.length,dailyVisits:b.dailyVisits.length,audit:b.audit.length}});
       }catch(e){try{this.ctx.storage.sql.exec("ROLLBACK")}catch{};return json({error:"Restore failed; database rollback attempted"},500)}
+    }
+    if(url.pathname==="/pages"&&request.method==="GET"){
+      const row=this.ctx.storage.sql.exec("SELECT config_value,updated_at FROM site_config WHERE config_key='page_cms'").toArray()[0];
+      let pages={};if(row){try{pages=JSON.parse(row.config_value)}catch{}}
+      return json({pages,updatedAt:row?.updated_at||null});
+    }
+    if(url.pathname==="/pages"&&request.method==="POST"){
+      let body;try{body=await request.json()}catch{return json({error:"Invalid JSON"},400)}
+      const allowed=["index","about","apps","advertise","battle-of-brains","contact","resources","upcoming"];
+      if(!body||typeof body.page!=="string"||!allowed.includes(body.page))return json({error:"Invalid page"},400);
+      const fields=["title","heroText","introText","sectionTitle","sectionText"];
+      const row=this.ctx.storage.sql.exec("SELECT config_value FROM site_config WHERE config_key='page_cms'").toArray()[0];
+      let pages={};if(row){try{pages=JSON.parse(row.config_value)}catch{}}
+      const content={};for(const f of fields){const v=String(body[f]??"").trim();if(v.length>1200)return json({error:f+" সর্বোচ্চ ১২০০ অক্ষর"},400);content[f]=v;}
+      pages[body.page]=content;const value=JSON.stringify(pages);
+      this.ctx.storage.sql.exec("INSERT INTO admin_audit(action,config_key,changed_at,summary) VALUES(?,?,?,?)","UPDATE","page_cms:"+body.page,now,"Page CMS updated: "+body.page);
+      this.ctx.storage.sql.exec("INSERT INTO site_config(config_key,config_value,updated_at) VALUES('page_cms',?,?) ON CONFLICT(config_key) DO UPDATE SET config_value=excluded.config_value,updated_at=excluded.updated_at",value,now);
+      return json({ok:true,page:body.page,content,updatedAt:now});
     }
     if(url.pathname==="/config"&&request.method==="GET"){
       const row=this.ctx.storage.sql.exec("SELECT config_value, updated_at FROM site_config WHERE config_key = 'announcement'").toArray()[0];
