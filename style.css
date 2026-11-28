@@ -229,3 +229,11 @@ body.home-page{
  .home-page .visitor-strip .counter-caption{font-size:8px}
  .home-page .visitor-strip .visitor-readout img{max-height:21px}
 }
+
+
+/* High-contrast visitor counter readouts */
+.home-page .visitor-strip .visitor-readout{min-width:92px;min-height:36px;padding:5px 10px;border:1px solid #b9a7e8;border-radius:10px;background:linear-gradient(145deg,#25164f,#3e2878);box-shadow:0 4px 12px rgba(49,29,100,.22);color:#fff;}
+.home-page .visitor-strip .visitor-readout img{display:block;max-width:100%;max-height:29px;height:auto;filter:brightness(1.22) contrast(1.16) drop-shadow(0 1px 2px #0008);}
+.home-page .visitor-strip .visitor-total{min-width:105px;}
+.home-page .visitor-strip .visitor-readout a{pointer-events:none!important;}
+@media(max-width:700px){.home-page .visitor-strip .visitor-readout{min-width:68px;min-height:31px;padding:4px 6px}.home-page .visitor-strip .visitor-readout img{max-height:25px}.home-page .visitor-strip .visitor-total{min-width:78px}}
