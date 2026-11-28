@@ -59,3 +59,80 @@ export default {
   return env.VISITOR_STORE.get(id).fetch(request);
  }
 };
+
+
+/* Durable Object that stores visitor counts. */
+export class VisitorStore {
+  constructor(ctx) {
+    this.ctx = ctx;
+    this.ctx.storage.sql.exec(`
+      CREATE TABLE IF NOT EXISTS visitors (
+        visitor_id TEXT PRIMARY KEY,
+        first_seen INTEGER NOT NULL,
+        last_seen INTEGER NOT NULL
+      )
+    `);
+    this.ctx.storage.sql.exec(`
+      CREATE TABLE IF NOT EXISTS daily_visits (
+        visitor_id TEXT NOT NULL,
+        visit_day TEXT NOT NULL,
+        PRIMARY KEY (visitor_id, visit_day)
+      )
+    `);
+  }
+
+  async fetch(request) {
+    const url = new URL(request.url);
+    const now = Date.now();
+    const parts = new Intl.DateTimeFormat("en-CA", {
+      timeZone: "Asia/Dhaka", year: "numeric", month: "2-digit", day: "2-digit"
+    }).formatToParts(new Date(now));
+    const values = Object.fromEntries(parts.map(part => [part.type, part.value]));
+    const today = `${values.year}-${values.month}-${values.day}`;
+
+    if (url.pathname === "/visit" && request.method === "POST") {
+      let body;
+      try { body = await request.json(); } catch { return json({ error: "Invalid JSON" }, 400); }
+      const visitorId = String(body.visitorId || "").slice(0, 100);
+      if (!/^[a-zA-Z0-9_-]{8,100}$/.test(visitorId)) return json({ error: "Valid visitorId required" }, 400);
+      const found = this.ctx.storage.sql.exec(
+        "SELECT visitor_id FROM visitors WHERE visitor_id = ?", visitorId
+      ).toArray().length > 0;
+      this.ctx.storage.sql.exec(`
+        INSERT INTO visitors (visitor_id, first_seen, last_seen) VALUES (?, ?, ?)
+        ON CONFLICT(visitor_id) DO UPDATE SET last_seen = excluded.last_seen
+      `, visitorId, now, now);
+      this.ctx.storage.sql.exec(
+        "INSERT OR IGNORE INTO daily_visits (visitor_id, visit_day) VALUES (?, ?)", visitorId, today
+      );
+      return json({ ok: true, newVisitor: !found });
+    }
+
+    if (url.pathname === "/heartbeat" && request.method === "POST") {
+      let body;
+      try { body = await request.json(); } catch { return json({ error: "Invalid JSON" }, 400); }
+      const visitorId = String(body.visitorId || "").slice(0, 100);
+      if (!/^[a-zA-Z0-9_-]{8,100}$/.test(visitorId)) return json({ error: "Valid visitorId required" }, 400);
+      this.ctx.storage.sql.exec("UPDATE visitors SET last_seen = ? WHERE visitor_id = ?", now, visitorId);
+      return json({ ok: true });
+    }
+
+    if (url.pathname === "/stats" && request.method === "GET") {
+      const total = this.ctx.storage.sql.exec("SELECT COUNT(*) AS total FROM visitors").one().total;
+      const online = this.ctx.storage.sql.exec(
+        "SELECT COUNT(*) AS total FROM visitors WHERE last_seen >= ?", now - 90000
+      ).one().total;
+      const todayCount = this.ctx.storage.sql.exec(
+        "SELECT COUNT(*) AS total FROM daily_visits WHERE visit_day = ?", today
+      ).one().total;
+      return json({
+        totalVisitors: total,
+        todayVisitors: todayCount,
+        currentlyOnline: online,
+        onlineWindowSeconds: 90,
+        timezone: "Asia/Dhaka"
+      });
+    }
+    return json({ error: "Not found" }, 404);
+  }
+}
