@@ -287,6 +287,9 @@ export class VisitorStore {
       for(const x of b.visitors)if(typeof x.visitor_id!=="string"||!Number.isFinite(Number(x.first_seen))||!Number.isFinite(Number(x.last_seen)))return json({error:"Invalid visitor row"},400);
       for(const x of b.dailyVisits)if(typeof x.visitor_id!=="string"||typeof x.visit_day!=="string")return json({error:"Invalid daily visit row"},400);
       for(const x of b.audit)if(typeof x.action!=="string"||typeof x.config_key!=="string"||!Number.isFinite(Number(x.changed_at))||typeof x.summary!=="string")return json({error:"Invalid audit row"},400);
+      if(b.dryRun===true){
+        return json({ok:true,dryRun:true,validated:true,counts:{siteConfig:b.siteConfig.length,visitors:b.visitors.length,dailyVisits:b.dailyVisits.length,audit:b.audit.length},message:"Backup validated; no database rows were changed."});
+      }
       try{
         this.ctx.storage.sql.exec("BEGIN");
         this.ctx.storage.sql.exec("DELETE FROM site_config");this.ctx.storage.sql.exec("DELETE FROM visitors");this.ctx.storage.sql.exec("DELETE FROM daily_visits");this.ctx.storage.sql.exec("DELETE FROM admin_audit");
