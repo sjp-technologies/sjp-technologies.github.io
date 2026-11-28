@@ -237,3 +237,17 @@ body.home-page{
 .home-page .visitor-strip .visitor-total{min-width:105px;}
 .home-page .visitor-strip .visitor-readout a{pointer-events:none!important;}
 @media(max-width:700px){.home-page .visitor-strip .visitor-readout{min-width:68px;min-height:31px;padding:4px 6px}.home-page .visitor-strip .visitor-readout img{max-height:25px}.home-page .visitor-strip .visitor-total{min-width:78px}}
+
+
+/* Cloudflare live visitor counter — clearly separated from historical Stats4U totals */
+.home-page .cloudflare-strip{position:relative;background:linear-gradient(110deg,#101b3b 0%,#172b57 48%,#20205b 100%);border-top:1px solid #5e79d5;border-bottom:1px solid #5266bd;box-shadow:0 8px 24px rgba(25,35,95,.18);color:#fff}
+.home-page .cloudflare-inner{max-width:790px;padding:13px 0 15px}
+.home-page .cloudflare-heading{display:flex;align-items:center;justify-content:center;gap:8px;color:#b8c9ff;font-family:"Noto Sans Bengali",Manrope,sans-serif;font-size:12px;font-weight:800;letter-spacing:.2px}
+.home-page .cloudflare-heading small{font-size:10px;font-weight:600;color:#a9b8df}
+.home-page .cloudflare-pulse{width:8px;height:8px;border-radius:50%;background:#35f0a1;box-shadow:0 0 0 4px #35f0a12a;animation:visitorPulse 1.5s ease-in-out infinite}
+.home-page .cloudflare-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px;margin-top:11px}
+.home-page .cloudflare-stat{min-width:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;padding:8px 5px;border:1px solid #7188d8;border-radius:12px;background:linear-gradient(145deg,#243d78,#192c59);box-shadow:inset 0 1px 0 #ffffff18,0 5px 14px #080f2e55}
+.home-page .cloudflare-stat span{font-family:"Noto Sans Bengali",Manrope,sans-serif;font-size:10px;font-weight:700;color:#c4d4ff;white-space:nowrap}
+.home-page .cloudflare-stat strong{font-family:Manrope,"Noto Sans Bengali",sans-serif;font-size:clamp(22px,3.5vw,29px);font-weight:800;line-height:1.2;letter-spacing:.5px;color:#66f2d1;text-shadow:0 0 12px #35e6c655;font-variant-numeric:tabular-nums}
+@media(max-width:700px){.home-page .cloudflare-inner{width:96%;padding:11px 0 13px}.home-page .cloudflare-grid{gap:6px;margin-top:9px}.home-page .cloudflare-stat{padding:8px 2px;border-radius:9px}.home-page .cloudflare-stat span{font-size:9px}.home-page .cloudflare-stat strong{font-size:22px}}
+@media(max-width:360px){.home-page .cloudflare-stat span{font-size:8px}.home-page .cloudflare-stat strong{font-size:19px}}
